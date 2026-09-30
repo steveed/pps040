@@ -13,6 +13,14 @@ On the reference machine (AmigaOS 3.2.3, MMULib, 32 MB on the card) that meant a
 instead of 30, with the 32-bit RAM preferred over the slow 24-bit RAM, and no startup-sequence
 changes other than deleting the old `AddMem`.
 
+## Why
+
+The memory had to be added via the startup-script so you could not test it using tools like
+xsysinfo. I also wanted to use AI (I use Claude) to help me learn about assembly language. Did I
+learn much? That is up for debate. The included walkthrough was useful for me in understanding
+how the code is written but it still leaves a lot of gaps for me. I am hoping to continue to work
+on this and learn more about assembly for the 68k.
+
 ## What's here
 
 | Path                     | What                                                              |
@@ -29,6 +37,7 @@ changes other than deleting the old `AddMem`.
 | `docs/hardware.md`       | the card: jumpers, memory layout, measurements                    |
 | `docs/reverse-engineering.md` | what the original driver does and how ppi2000mem differs     |
 | `docs/rom.md`            | testing, building, burning, MMULib setup                          |
+| `docs/walkthrough.md`    | the assembly explained for Python developers                      |
 
 ## Using a release
 
