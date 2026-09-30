@@ -296,25 +296,28 @@ chip RAM, and the module is gone.
 
 ## 7. The tests
 
-`make test` runs pytest in the tools container. All three test files run code on
-[Unicorn](https://www.unicorn-engine.org/), an emulated 68040 driven from Python.
-
-`tests/test_ppi2000mem.py`:
+`make test` runs pytest in the tools container. The tests run the assembled code on
+[Unicorn](https://www.unicorn-engine.org/), an emulated 68040 driven from Python, on a small fake
+Amiga in `tests/amiga.py`:
 
 1. A fixture in `conftest.py` assembles the current source, so the tests never run a stale binary.
-2. The module is loaded with the same loader `mkrom.py` uses, and its `init` is called the way exec
-   calls it.
-3. Just enough of AmigaOS is faked. ExecBase and its memory list are real bytes in emulated memory.
-   Each library vector slot holds an `rts`, and a code hook runs a Python stand-in
-   (`_lib_AddMemList`, `_lib_FindConfigDev`, …) just before it executes. The stand-ins deliberately
-   overwrite `d1`, `a0` and `a1`, as real calls may.
-4. The card is simulated. Its SIMMs are one `mmap` buffer mapped at $08000000; in 2 MB mode part of
+2. Just enough of AmigaOS is faked. ExecBase and its memory list of MemHeaders are real bytes in
+   emulated memory. Each library vector slot holds an `rts`, and a code hook runs a Python
+   stand-in (`_lib_AddMemList`, `_lib_FindConfigDev`, `_lib_VPrintf`, …) just before it executes.
+   The stand-ins deliberately overwrite `d1`, `a0` and `a1`, as real calls may. `VPrintf` formats
+   with a Python version of exec's `RawDoFmt`.
+3. The card is simulated. Its SIMMs are one `mmap` buffer mapped at $08000000; in 2 MB mode part of
    it is mapped a second time at $00200000, reproducing the real card's alias. Above the fitted
    SIMMs the tests try three behaviours: a mirror, an open bus reading $FFFFFFFF, and an open bus
-   reading back the last value written.
-5. The tests assert the exact `AddMemList` calls, no writes into the live 24-bit RAM, a balanced
-   stack and restored registers. Each scenario runs twice, with the registers starting at 0 and at
-   $FFFFF000, to catch variables used before they're set.
+   reading back the last value written. One chunk can be made faulty, losing every other write.
+
+`tests/test_ppi2000mem.py` calls the module's `init` the way exec does and asserts the exact
+`AddMemList` calls, no writes into the live 24-bit RAM, a balanced stack and restored registers.
+Each scenario runs twice, with the registers starting at 0 and at $FFFFF000, to catch variables
+used before they're set.
+
+`tests/test_ppiprobe.py` runs `ppiprobe` and checks the lines it prints, and that every byte of
+the SIMMs, including the live 24-bit RAM, is the same afterwards.
 
 `tests/test_ppiload.py` runs `ppiload` and checks the `KickMemPtr` list, the `KickTagPtr` table
 (chained to an existing one when there is one), the relocated RomTag, and that the checksum is

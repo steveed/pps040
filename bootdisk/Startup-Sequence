@@ -2,9 +2,5 @@
 ; There is no SetPatch here on purpose: SetPatch loads 68040.library
 ; (MMULib), which turns the MMU on and marks the unused 32-bit addresses
 ; invalid, so ppiprobe could not look at them.
-Echo "PP&S 2000/040 test disk"
 ppiprobe
-Echo ""
-Echo "To try the memory module without burning a ROM, type: ppiload"
-Echo "The machine reboots with the module installed; boot this disk again"
-Echo "and check the memory list. Switching the power off removes it."
+Echo "Type ppiload to try the module until power-off."

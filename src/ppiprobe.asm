@@ -2,10 +2,13 @@
 ;
 ; Run from a Shell with the MMU off (boot with no startup-sequence), since
 ; MMULib marks unused addresses invalid. For every 2 MB chunk from $08000000 to
-; $09FFFFFF it reports whether the chunk holds RAM, mirrors an earlier chunk,
-; or is the same memory as the card's 24-bit autoconfig RAM. Every location
-; written is restored before interrupts are enabled again, and no test pattern
-; is written into memory the system already uses.
+; $09FFFFFF it finds out whether the chunk holds RAM, mirrors an earlier chunk,
+; or is the same memory as the card's 24-bit autoconfig RAM, and reports
+; neighbouring chunks with the same result as one range, so the whole report
+; fits on one screen. Every location written is restored before interrupts are
+; enabled again, and no test pattern is written into memory the system already
+; uses. Bits are tested in registers: the Unicorn emulator behind tests/ aborts
+; on bit operations with memory operands.
 
         machine 68040
 
@@ -56,6 +59,14 @@ TOP_LONG                equ (1<<CHUNK_SHIFT)-4
 ST_INUSE                equ 1
 ST_ALIAS                equ 2
 
+; What classify reports for a chunk, in the order of the runfmts table.
+K_INUSE                 equ 0
+K_ALIAS                 equ 1
+K_MIRROR                equ 2
+K_RAM                   equ 3
+K_NONE                  equ 4
+K_FLAKY                 equ 5
+
         section code,code
 
 start:
@@ -72,7 +83,8 @@ start:
         lea     s_header(pc),a0
         bsr     print0
         bsr     showresident
-        btst    #AFB_68040,AttnFlags+1(a6)
+        move.w  AttnFlags(a6),d0
+        btst    #AFB_68040,d0
         bne     .is040
         lea     s_not040(pc),a0
         bsr     print0
@@ -112,6 +124,16 @@ gettc:
         movec   tc,d0
         rte
 
+; nextlabel: store the current label as the first argument at (a1); later
+; lines of the same section get an empty label.
+nextlabel:
+        move.l  v_label(a3),(a1)
+        move.l  a0,-(sp)
+        lea     s_empty(pc),a0
+        move.l  a0,v_label(a3)
+        movea.l (sp)+,a0
+        rts
+
 ; print(a0 = format, a1 = argument array); print0 takes no arguments.
 print0:
         suba.l  a1,a1
@@ -139,39 +161,34 @@ showresident:
         bra     print
 .print: bra     print0
 
-; Print the system memory list: mh_Lower-mh_Upper, size, attributes,
-; priority, name.
+; Print the system memory list: mh_Lower, size, priority, name. Every line
+; of the report stays within 60 characters: the boot Shell window is narrow.
 listmem:
         move.l  a2,-(sp)
-        lea     s_memlist(pc),a0
-        bsr     print0
+        lea     s_lblmem(pc),a0
+        move.l  a0,v_label(a3)
         jsr     _LVOForbid(a6)
         movea.l MemList(a6),a2
 .loop:  tst.l   LN_SUCC(a2)
         beq     .done
         lea     v_args(a3),a1
+        bsr     nextlabel
         move.l  mh_Lower(a2),d0
-        move.l  d0,(a1)
-        move.l  mh_Upper(a2),d1
-        subq.l  #1,d1
-        move.l  d1,4(a1)
+        move.l  d0,4(a1)
         move.l  mh_Upper(a2),d1
         sub.l   d0,d1
         moveq   #10,d0
         lsr.l   d0,d1
         move.l  d1,8(a1)
-        moveq   #0,d0
-        move.w  mh_Attributes(a2),d0
-        move.l  d0,12(a1)
         move.b  LN_PRI(a2),d0
         ext.w   d0
         ext.l   d0
-        move.l  d0,16(a1)
+        move.l  d0,12(a1)
         lea     s_noname(pc),a0
         move.l  LN_NAME(a2),d0
         beq     .named
         movea.l d0,a0
-.named: move.l  a0,20(a1)
+.named: move.l  a0,16(a1)
         lea     s_memline(pc),a0
         bsr     print
         movea.l LN_SUCC(a2),a2
@@ -197,8 +214,8 @@ scanboards:
         tst.l   d0
         beq     .out
         movea.l d0,a5
-        lea     s_boards(pc),a0
-        bsr     print0
+        lea     s_lblboards(pc),a0
+        move.l  a0,v_label(a3)
         suba.l  a2,a2
 .scan:  movea.l a2,a0
         moveq   #-1,d0
@@ -219,18 +236,20 @@ scanboards:
 .ours:  moveq   #1,d0
         move.l  d0,v_found(a3)
         lea     v_args(a3),a1
-        move.l  cd_BoardAddr(a2),(a1)
+        bsr     nextlabel
+        move.l  cd_BoardAddr(a2),4(a1)
         move.l  cd_BoardSize(a2),d0
         moveq   #10,d1
         lsr.l   d1,d0
-        move.l  d0,4(a1)
-        moveq   #0,d0
-        move.w  er_Manufacturer(a2),d0
         move.l  d0,8(a1)
         moveq   #0,d0
-        move.b  er_Product(a2),d0
+        move.w  er_Manufacturer(a2),d0
         move.l  d0,12(a1)
-        btst    #ERTB_MEMLIST,er_Type(a2)
+        moveq   #0,d0
+        move.b  er_Product(a2),d0
+        move.l  d0,16(a1)
+        move.b  er_Type(a2),d0
+        btst    #ERTB_MEMLIST,d0
         beq     .io
         move.l  cd_BoardAddr(a2),v_r24base(a3)
         move.l  cd_BoardSize(a2),v_r24size(a3)
@@ -240,7 +259,7 @@ scanboards:
 .io:    movea.l cd_BoardAddr(a2),a0
         moveq   #0,d0
         move.b  PPI_STATUS(a0),d0
-        move.l  d0,16(a1)
+        move.l  d0,20(a1)
         lea     s_ioboard(pc),a0
         bsr     print
         bra     .scan
@@ -419,92 +438,137 @@ saveslot:
         adda.l  d0,a1
         rts
 
+; Print the chunks as runs: neighbouring chunks with the same result form
+; one line. A mirror or 24-bit alias only continues a run if its target
+; continues too; an unreliable chunk is always a line of its own.
+; d3 = target of the run's last chunk, d4 = run kind, d5 = run's first target,
+; d6 = first chunk after the run, d7 = first chunk of the run
 report:
         movem.l d2-d7/a2,-(sp)
-        lea     s_chunks(pc),a0
-        bsr     print0
-        moveq   #0,d4                   ; MB of 32-bit-only RAM
-        moveq   #0,d5                   ; MB shared with the 24-bit RAM
+        lea     s_lbl32(pc),a0
+        move.l  a0,v_label(a3)
         moveq   #0,d7
-.loop:  move.l  d7,d0
+.run:   move.l  d7,d0
+        bsr     classify
+        move.l  d0,d4
+        move.l  d1,d5
+        move.l  d1,d3
+        move.l  d7,d6
+.grow:  addq.l  #1,d6
+        cmpi.l  #NCHUNKS,d6
+        bcc     .emit
+        cmpi.l  #K_FLAKY,d4
+        beq     .emit
+        move.l  d6,d0
+        bsr     classify
+        cmp.l   d4,d0
+        bne     .emit
+        cmpi.l  #K_ALIAS,d0
+        beq     .follows
+        cmpi.l  #K_MIRROR,d0
+        bne     .grow
+.follows:
+        move.l  d3,d2
+        addi.l  #1<<CHUNK_SHIFT,d2
+        cmp.l   d2,d1
+        bne     .emit
+        move.l  d1,d3
+        bra     .grow
+.emit:  lea     v_args(a3),a1
+        bsr     nextlabel
+        move.l  d7,d0
         bsr     chunkaddr
-        lea     v_args(a3),a1
-        move.l  a2,(a1)
+        move.l  a2,4(a1)
+        move.l  d6,d0
+        bsr     chunkaddr
+        move.l  a2,d0
+        subq.l  #1,d0
+        move.l  d0,8(a1)
+        move.l  d6,d0
+        sub.l   d7,d0
+        add.l   d0,d0                   ; 2 MB per chunk
+        move.l  d0,12(a1)
+        move.l  d5,16(a1)
+        lea     runfmts(pc),a0
+        move.l  d4,d0
+        add.w   d0,d0
+        adda.w  (a0,d0.w),a0
+        bsr     print
+        move.l  d6,d7
+        cmpi.l  #NCHUNKS,d7
+        bcs     .run
+        movem.l (sp)+,d2-d7/a2
+        rts
+
+; classify(d0 = chunk index): d0 = K_ kind, d1 = target (24-bit address for
+; K_ALIAS, mirrored chunk's address for K_MIRROR, matching longs otherwise)
+classify:
+        move.l  d2,-(sp)
+        move.l  d0,d2
         lea     v_state(a3),a0
-        move.l  (a0,d7.l*4),d0
+        move.l  (a0,d2.l*4),d0
         btst    #0,d0
         beq     .notinuse
-        lea     s_inuse(pc),a0
+        moveq   #K_INUSE,d0
+        moveq   #0,d1
         bra     .out
 .notinuse:
         btst    #1,d0
         beq     .notalias
         lea     v_alias(a3),a0
-        move.l  (a0,d7.l*4),4(a1)
-        addq.l  #2,d5
-        lea     s_alias(pc),a0
+        move.l  (a0,d2.l*4),d1
+        moveq   #K_ALIAS,d0
         bra     .out
 .notalias:
         lea     v_mirror(a3),a0
-        move.l  (a0,d7.l*4),d0
+        move.l  (a0,d2.l*4),d1
         beq     .notmirror
-        subq.l  #1,d0
-        moveq   #CHUNK_SHIFT,d1
-        lsl.l   d1,d0
-        addi.l  #RAM32_BASE,d0
-        move.l  d0,4(a1)
-        lea     s_mirror(pc),a0
+        subq.l  #1,d1
+        moveq   #CHUNK_SHIFT,d0
+        lsl.l   d0,d1
+        addi.l  #RAM32_BASE,d1
+        moveq   #K_MIRROR,d0
         bra     .out
 .notmirror:
         lea     v_good(a3),a0
-        move.l  (a0,d7.l*4),d0
-        move.l  d0,4(a1)
-        bne     .some
-        lea     s_none(pc),a0
-        bra     .out
-.some:  cmpi.l  #PROBE_LONGS,d0
-        bne     .flaky
-        addq.l  #2,d4
-        lea     s_ram(pc),a0
-        bra     .out
-.flaky: lea     s_flaky(pc),a0
-.out:   bsr     print
-        addq.l  #1,d7
-        cmpi.l  #NCHUNKS,d7
-        bcs     .loop
-        lea     v_args(a3),a1
-        move.l  d4,(a1)
-        move.l  d5,4(a1)
-        lea     s_total(pc),a0
-        bsr     print
-        movem.l (sp)+,d2-d7/a2
+        move.l  (a0,d2.l*4),d1
+        moveq   #K_NONE,d0
+        tst.l   d1
+        beq     .out
+        moveq   #K_RAM,d0
+        cmpi.l  #PROBE_LONGS,d1
+        beq     .out
+        moveq   #K_FLAKY,d0
+.out:   move.l  (sp)+,d2
         rts
+
+runfmts:    dc.w s_inuse-runfmts,s_alias-runfmts,s_mirror-runfmts
+            dc.w s_ram-runfmts,s_none-runfmts,s_flaky-runfmts
 
 dosname:    dc.b "dos.library",0
 modname:    dc.b "ppi2000mem",0
-s_module:   dc.b "ppi2000mem module: resident at $%08lx, %s",0
-s_nomodule: dc.b "ppi2000mem module: not resident",10,0
 expname:    dc.b "expansion.library",0
-s_header:   dc.b "ppiprobe 1.2 - PP&S 2000/040 memory probe (adds nothing)",10,0
+s_header:   dc.b "ppiprobe 1.4 - PP&S 2000/040 memory probe (adds nothing)",10,0
+s_module:   dc.b "Module:  $%08lx %s",0
+s_nomodule: dc.b "Module:  ppi2000mem not resident",10,0
 s_not040:   dc.b "The CPU is not a 68040. Is the card switched to 68000 mode?",10,0
-s_mmuon:    dc.b "The MMU is on, so the unused addresses cannot be probed safely.",10
+s_mmuon:    dc.b "The MMU is on; unused addresses can't be probed safely.",10
             dc.b "Boot with no startup-sequence and run ppiprobe again.",10,0
 s_noboard:  dc.b "No PP&S 2000/040 autoconfig board found; not probing.",10,0
-s_memlist:  dc.b 10,"System memory list:",10,0
-s_memline:  dc.b "  $%08lx-$%08lx %6ldK  attr $%04lx  pri %4ld  %.24s",10,0
+s_lblmem:   dc.b "Memory:",0
+s_lblboards: dc.b "Boards:",0
+s_lbl32:    dc.b "32-bit:",0
+s_empty:    dc.b 0
+s_memline:  dc.b "%-9s$%08lx %6ldK pri %3ld %.20s",10,0
 s_noname:   dc.b "(no name)",0
-s_boards:   dc.b 10,"PP&S autoconfig boards:",10,0
-s_ramboard: dc.b "  $%08lx %5ldK  RAM  manufacturer %ld, product %ld",10,0
-s_ioboard:  dc.b "  $%08lx %5ldK  I/O  manufacturer %ld, product %ld, "
-            dc.b "jumper byte $%02lx",10,0
-s_chunks:   dc.b 10,"32-bit area, 2 MB chunks:",10,0
-s_inuse:    dc.b "  $%08lx  already in the system memory list, not tested",10,0
-s_alias:    dc.b "  $%08lx  same memory as the 24-bit RAM at $%08lx",10,0
-s_mirror:   dc.b "  $%08lx  mirror of $%08lx",10,0
-s_none:     dc.b "  $%08lx  no RAM",10,0
-s_ram:      dc.b "  $%08lx  RAM",10,0
-s_flaky:    dc.b "  $%08lx  UNRELIABLE: %ld of 64 test longs correct",10,0
-s_total:    dc.b 10,"32-bit-only RAM: %ld MB, shared with the 24-bit RAM: %ld MB",10,0
+s_ramboard: dc.b "%-9s$%08lx %6ldK RAM %ld/%ld",10,0
+s_ioboard:  dc.b "%-9s$%08lx %6ldK I/O %ld/%ld jumpers $%02lx",10,0
+s_inuse:    dc.b "%-9s$%08lx-$%08lx %3ld MB in memory list",10,0
+s_alias:    dc.b "%-9s$%08lx-$%08lx %3ld MB same as 24-bit $%08lx",10,0
+s_mirror:   dc.b "%-9s$%08lx-$%08lx %3ld MB mirror of $%08lx",10,0
+s_ram:      dc.b "%-9s$%08lx-$%08lx %3ld MB RAM",10,0
+s_none:     dc.b "%-9s$%08lx-$%08lx %3ld MB no RAM",10,0
+s_flaky:    dc.b "%-9s$%08lx-$%08lx %3ld MB UNRELIABLE (%ld/64 ok)",10,0
         even
 
         section vars,bss
@@ -512,7 +576,8 @@ vars:
 v_found     equ 0
 v_r24base   equ 4
 v_r24size   equ 8
-v_args      equ 12                      ; 8 longs
+v_label     equ 12                      ; label for the next line
+v_args      equ 16                      ; 8 longs
 v_state     equ v_args+8*4              ; NCHUNKS longs each
 v_alias     equ v_state+NCHUNKS*4
 v_mirror    equ v_alias+NCHUNKS*4

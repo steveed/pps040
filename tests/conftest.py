@@ -35,3 +35,10 @@ def ppiload_code():
     assemble("ppi2000mem.asm", ROOT / "build" / "ppi2000mem.bin", "bin")
     assemble("ppiload.asm", ROOT / "build" / "ppiload")
     return load_module(ROOT / "build" / "ppiload")
+
+
+@pytest.fixture(scope="session")
+def ppiprobe_path():
+    out = ROOT / "build" / "ppiprobe"
+    assemble("ppiprobe.asm", out)
+    return out

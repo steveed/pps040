@@ -10,7 +10,9 @@ string in `src/ppi2000mem.asm`.
 - Fix: with 24-bit autoconfig RAM jumpered on, 1.0's first test used an uninitialised end pointer
   and, depending on leftover register contents, could add no 32-bit RAM at all.
 - Bits are tested in registers, so the module runs under the Unicorn-based tests.
-- ppiprobe 1.2 shows the resident module's version string.
+- ppiprobe 1.4 shows the resident module's version, and reports neighbouring chunks with the
+  same result as one range, in lines of at most 60 characters, so the whole report fits in
+  the boot Shell window.
 - ppiload: installs the module until the next power-off and reboots, replacing LoadModule.
 - The test floppy is built only from this project's files and is part of each release.
 

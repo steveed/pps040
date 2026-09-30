@@ -5,14 +5,31 @@
 `make bootdisk` builds `build/pps040-test.adf`; every release also has it as
 `pps040-<version>.adf`. It contains only this project's files: the Shell and `Echo` come from the
 Kickstart ROM. It boots without SetPatch, so MMULib never loads and the MMU stays off, and it
-runs `ppiprobe`, which reports:
+runs `ppiprobe`, which reports on one screen:
 
-- whether the `ppi2000mem` module is resident, where, and its version;
-- the system memory list;
-- the card's autoconfig boards and its jumper byte;
-- every 2 MB chunk from $08000000 to $09FFFFFF: RAM, no RAM, mirror, same memory as the 24-bit
-  RAM, or unreliable. It skips anything already in the memory list and restores everything it
-  writes.
+- `Module:` whether the `ppi2000mem` module is resident, where, and its version;
+- `Memory:` the system memory list;
+- `Boards:` the card's autoconfig boards and its jumper byte;
+- `32-bit:` the area from $08000000 to $09FFFFFF in 2 MB chunks, with neighbouring chunks that
+  have the same result merged into one range: RAM, no RAM, mirror of another chunk, same RAM as
+  the 24-bit RAM, already in the memory list, or unreliable. It skips anything already in the
+  memory list and restores everything it writes.
+
+For example, on the reference machine with the module in ROM and 2 MB of autoconfig RAM:
+
+```
+ppiprobe 1.4 - PP&S 2000/040 memory probe (adds nothing)
+Module:  $00FFCF24 ppi2000mem 1.1 (29.9.2026)
+Memory:  $08000020   2047K pri  30 PPI 32Bit RAM
+         $08400020  28671K pri  30 PPI 32Bit RAM ][
+         $00200020   2047K pri   0 expansion memory
+         $00001020   2043K pri -10 chip memory
+Boards:  $00E90000     64K I/O 2026/105 jumpers $EC
+         $00200000   2048K RAM 2026/105
+32-bit:  $08000000-$081FFFFF   2 MB in memory list
+         $08200000-$083FFFFF   2 MB same as 24-bit $00200000
+         $08400000-$09FFFFFF  28 MB in memory list
+```
 
 To try the module before burning, type `ppiload`. It copies the module into chip RAM, registers
 it with exec as reset-proof (the way LoadModule does) and reboots, so the module runs at the next
