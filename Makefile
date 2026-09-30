@@ -4,6 +4,8 @@
 
 KICK   ?= amiga_roms/CDTVA500A600A2000.47.115.rom
 ROM    := build/$(basename $(notdir $(KICK)))-ppi2000mem
+# COPIES=4 also writes $(ROM)-x4.bin, e.g. for a 2 MB MX29F1615 in a 512K socket.
+COPIES ?= 1
 # Set by the release workflow; mkrelease.sh refuses a tag that doesn't match
 # the version in src/ppi2000mem.asm.
 RELEASE_TAG ?=
@@ -21,7 +23,8 @@ help:
 	@echo "make fetch     download the PP&S driver disks into vendor/"
 	@echo "make disasm    disassemble Init040 and ppi040.library into build/disasm"
 	@echo "make bootdisk  build the bootable test floppy build/pps040-test.adf"
-	@echo "make rom       patch KICK with the module into $(ROM)*"
+	@echo "make rom       patch KICK with the module into $(ROM).rom/.bin"
+	@echo "               (COPIES=4 also writes -x4.bin for a 2 MB chip)"
 	@echo "make release   package the binaries, mkrom.py and docs in build/release"
 
 image:
@@ -49,11 +52,10 @@ disasm: fetch
 bootdisk:
 	$(RUN) tools/mkbootdisk.sh
 
-# .rom for emulators and MapROM, .bin byte-swapped for burning, and -x4.bin
-# with four copies for a 2 MB MX29F1615 / 27C160 in a 512K socket.
+# .rom for emulators and MapROM, .bin byte-swapped for burning; see COPIES.
 rom: modules
 	@test -f "$(KICK)" || { echo "No Kickstart image at $(KICK); set KICK=path/to/kick.rom" >&2; exit 1; }
-	$(RUN) sh -c 'python tools/mkrom.py $(KICK) build/ppi2000mem $(ROM) && \
+	$(RUN) sh -c 'python tools/mkrom.py --copies $(COPIES) $(KICK) build/ppi2000mem $(ROM) && \
 		romtool info $(ROM).rom | grep chk_sum && romtool scan $(ROM).rom | tail -1'
 
 release: modules test

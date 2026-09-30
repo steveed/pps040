@@ -3,6 +3,11 @@
 Versions are those of the ppi2000mem ROM module; a release tag `vX.Y` must match the version
 string in `src/ppi2000mem.asm`.
 
+## Unreleased
+
+- mkrom.py writes only the .rom and .bin by default; `--copies N` (`make rom COPIES=N`) adds the
+  -xN.bin with N copies, which only fits some setups, such as a 2 MB MX29F1615 in a 512K socket.
+
 ## 1.1 (2026-09-29)
 
 - Fix: every newly tested 2 MB chunk is now read back. 1.0 only re-checked the chunks found

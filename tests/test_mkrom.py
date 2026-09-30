@@ -97,15 +97,23 @@ def test_not_a_kickstart_is_refused(module_code):
         patch_rom(bytes(256 * 1024), code, relocs)
 
 
-def test_command_line_writes_all_images(module_path, tmp_path):
+def mkrom(tmp_path, module_path, *options):
     kick = tmp_path / "kick.rom"
     kick.write_bytes(fake_kickstart())
-    out = tmp_path / "patched"
-    subprocess.run([sys.executable, str(ROOT / "tools" / "mkrom.py"), str(kick),
-                    str(module_path), str(out)], check=True, capture_output=True)
+    subprocess.run([sys.executable, str(ROOT / "tools" / "mkrom.py"), *options, str(kick),
+                    str(module_path), str(tmp_path / "patched")],
+                   check=True, capture_output=True)
+    return sorted(p.name for p in tmp_path.iterdir() if p.name.startswith("patched"))
+
+
+def test_command_line_writes_rom_and_bin(module_path, tmp_path):
+    assert mkrom(tmp_path, module_path) == ["patched.bin", "patched.rom"]
     rom = (tmp_path / "patched.rom").read_bytes()
-    binary = (tmp_path / "patched.bin").read_bytes()
-    x4 = (tmp_path / "patched-x4.bin").read_bytes()
     assert kick_checksum_ok(rom)
-    assert binary == byteswap(rom)
-    assert x4 == binary * 4
+    assert (tmp_path / "patched.bin").read_bytes() == byteswap(rom)
+
+
+def test_copies_writes_a_larger_image(module_path, tmp_path):
+    assert "patched-x4.bin" in mkrom(tmp_path, module_path, "--copies", "4")
+    binary = (tmp_path / "patched.bin").read_bytes()
+    assert (tmp_path / "patched-x4.bin").read_bytes() == binary * 4

@@ -4,9 +4,11 @@
 Exec finds resident modules by scanning the ROM for their RomTag, so the
 module only has to sit in the $FF-filled free area with its relocations applied
 for that address. The Kickstart checksum is then recomputed. Writes a .rom
-(for emulators and MapROM), a byte-swapped .bin (for burning 16-bit ROMs)
-and, by default, a -x4.bin with four copies of it for a 2 MB MX29F1615 or
-27C160 in a 512K socket. Needs only Python 3.8+, no other packages.
+(for emulators and MapROM) and a byte-swapped .bin (for burning 16-bit ROMs).
+With --copies N it also writes a -xN.bin holding N copies of the .bin, for a
+larger chip in a 512K socket, such as a 2 MB MX29F1615 or 27C160 whose extra
+address lines aren't connected (--copies 4). Needs only Python 3.8+, no other
+packages.
 
 Usage: mkrom.py <kick.rom> <module hunk file> <output base name> [--copies N]
 """
@@ -132,9 +134,9 @@ def main():
     ap.add_argument("kick", help="512K Kickstart image (.rom)")
     ap.add_argument("module", help="assembled module (hunk executable)")
     ap.add_argument("out", help="output name without extension")
-    ap.add_argument("--copies", type=int, default=4,
-                    help="also write OUT-xN.bin with N copies of the .bin, for "
-                         "larger chips in a 512K socket (default 4, 1 = off)")
+    ap.add_argument("--copies", type=int, default=1,
+                    help="also write OUT-xN.bin with N copies of the .bin, for a "
+                         "larger chip in a 512K socket, e.g. 4 for a 2 MB MX29F1615")
     args = ap.parse_args()
 
     code, relocs = load_module(args.module)

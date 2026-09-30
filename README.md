@@ -50,8 +50,9 @@ packages):
 python3 mkrom.py CDTVA500A600A2000.47.115.rom ppi2000mem kick-ppi2000mem
 ```
 
-This writes `kick-ppi2000mem.rom`, `.bin` and `-x4.bin`. Try the module with `ppiload` before
-burning; see [docs/rom.md](docs/rom.md).
+This writes `kick-ppi2000mem.rom` (for emulators and MapROM) and the byte-swapped
+`kick-ppi2000mem.bin` for burning. Add `--copies 4` for a 2 MB chip such as an MX29F1615 in the
+512K socket. Try the module with `ppiload` before burning; see [docs/rom.md](docs/rom.md).
 
 ## Building from source
 
@@ -68,7 +69,7 @@ burning; see [docs/rom.md](docs/rom.md).
 make image       # build the tools container
 make test        # run the module against the simulated cards
 make bootdisk    # build/pps040-test.adf: probe the card, try the module with ppiload
-make rom         # build/<kickstart>-ppi2000mem{.rom,.bin,-x4.bin}
+make rom         # build/<kickstart>-ppi2000mem.rom and .bin (COPIES=4 adds -x4.bin)
 ```
 
 Then follow [docs/rom.md](docs/rom.md): probe first, try the module with ppiload, and only then

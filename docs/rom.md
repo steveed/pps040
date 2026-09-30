@@ -61,7 +61,7 @@ Output, next to the input's name in `build/`:
 |---------------|--------------------------------------------------------------------|
 | `….rom`       | emulators and MapROM                                               |
 | `….bin`       | 512K, byte-swapped for burning (same order as Hyperion's `.bin`)   |
-| `…-x4.bin`    | 2 MB: four copies of the `.bin`, for an MX29F1615 / 27C160         |
+| `…-x4.bin`    | only with `COPIES=4` / `--copies 4`: four copies of the `.bin`, for a 2 MB MX29F1615 / 27C160 |
 
 ## 3. Try it in an emulator
 
@@ -73,7 +73,8 @@ the module as resident (at $00FFCF24 for the 3.2.3 ROM). With a 68000 it stops t
 
 The reference machine uses an MX29F1615 (2 MB, 16-bit) on a 42-to-40-pin adapter in the A2000's
 Kickstart socket, programmed with a GQ-4x4. The chip's two top address lines are left unconnected,
-so their level isn't guaranteed: burn `-x4.bin`, which has the same ROM in all four 512K slots.
+so their level isn't guaranteed: build with `make rom COPIES=4` and burn `-x4.bin`, which has
+the same ROM in all four 512K slots.
 The byte-swapped image is the right one for this setup; the unswapped one gives a black screen
 and a pulsing power LED.
 
