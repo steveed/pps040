@@ -1,0 +1,12 @@
+# Copyrighted material that must never be published:
+# Kickstart ROMs (Hyperion), used by `make rom`
+amiga_roms/
+# PP&S driver disks and manual, fetched by `make fetch`
+vendor/
+# Build output: patched Kickstart images contain Hyperion code and the
+# disassembly listings are PP&S's code; everything else is rebuilt anyway.
+build/
+
+.DS_Store
+__pycache__/
+.pytest_cache/

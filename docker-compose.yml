@@ -1,0 +1,9 @@
+services:
+  tools:
+    build: ./docker
+    # A fixed name, so CI can build the image with a layer cache and compose
+    # uses it rather than building again.
+    image: pps040-tools
+    volumes:
+      - .:/work
+    working_dir: /work
