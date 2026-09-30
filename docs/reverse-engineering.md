@@ -77,8 +77,9 @@ Resulting layout, where N is the size of the 24-bit autoconfig RAM:
 | 4 MB | $08000000–$081FFFFF; $08600000–end                                          |
 | 8 MB | $08000000–$081FFFFF; $08A00000–end                                          |
 
-The hole starting at $08200000 is always exactly N bytes. That is almost certainly the same SIMM
-memory the card shows in Zorro II space as its autoconfig RAM, so it must not be added twice.
+The hole starting at $08200000 is always exactly N bytes. It is the same SIMM memory the card
+shows in Zorro II space as its autoconfig RAM (confirmed with `ppiprobe` on the reference card), so
+it must not be added twice.
 
 ## What ppi2000mem does differently
 
@@ -102,10 +103,9 @@ Version 1.0 had a bug: after writing a chunk's pattern it fell through into the 
 
 ## Open questions
 
-- Which manufacturer ID (2026 or 756) belongs to which of the card's two boards? In 0 MB mode the
-  I/O board reports 2026.
-- Confirm on hardware that $08200000 aliases the 24-bit RAM: with the MMU off and 2 MB autoconfig,
-  `ppiprobe` reports it either as "same memory as the 24-bit RAM" or as plain RAM.
+- Where does manufacturer ID 756 come from? On the reference card both boards (I/O and RAM)
+  report 2026/105; amiga.resource.cx also lists 756/105, perhaps from another revision.
+  ppi2000mem accepts either.
 - On the Zeus (`S0_0D62`), clearing bit 1 of $E90003 after copying the ROM to $08180000 switches
   on a hardware ROM remap. Unknown whether the 2000 has the same hardware.
 

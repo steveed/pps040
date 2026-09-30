@@ -28,15 +28,16 @@ SIMMs are fitted in groups of four: 1 MB SIMMs give 4 or 8 MB, 4 MB SIMMs give 1
 The card autoconfigures as up to two Zorro II boards, both product 105:
 
 - **A 64K I/O board**, normally at $E90000. Offset 3 is a read-only jumper byte:
-  bits 1 and 6 reflect the autoconfig RAM jumpers, bit 5 is set for 4 MB SIMMs. Seen: $A0 with
-  0 MB autoconfig and 4 MB SIMMs.
+  bits 1 and 6 reflect the autoconfig RAM jumpers, bit 5 is set for 4 MB SIMMs. Seen with 4 MB
+  SIMMs: $A0 with 0 MB autoconfig, $EC with 2 MB autoconfig (bit 6 set; bits 2 and 3 also
+  changed between the two readings, possibly from the cache and burst jumpers).
 - **The 24-bit autoconfig RAM** (2, 4 or 8 MB, normally from $200000), only when jumpered on.
   This is the only fast RAM a Zorro II DMA controller such as the A2091 can reach.
 
 The rest of the SIMM memory is 32-bit RAM from $08000000. It does not autoconfigure; software has
 to add it (originally `Init040 ADDMEM`, here the ppi2000mem ROM module). The part of the SIMMs
 used as 24-bit RAM also appears in the 32-bit area, starting at $08200000, so that range is left
-out. See [reverse-engineering.md](reverse-engineering.md) for the full layout per jumper setting.
+out. `ppiprobe` confirmed this on the reference card: writing at $08200000 changes $00200000. See [reverse-engineering.md](reverse-engineering.md) for the full layout per jumper setting.
 
 ## Reference machine
 
@@ -61,6 +62,11 @@ The startup-sequence had `C:AddMem $08400000 $09ffffff` after SetPatch and `MuFa
   Prelude at $EB0000, A2065 at $EC0000.
 
 ### After (ppi2000mem in ROM)
+
+With 2 MB autoconfig and the module in ROM, the memory list shows "PPI 32Bit RAM" (2 MB at
+$08000000) and "PPI 32Bit RAM ][" (28 MB at $08400000), both at priority 30, above the 24-bit
+expansion memory (priority 0) and chip RAM (-10): all 32 MB in use. See the `ppiprobe` output in
+[rom.md](rom.md).
 
 With 0 MB autoconfig, `ppiprobe` (MMU off) found only the I/O board (manufacturer 2026, jumper
 byte $A0) and RAM in all 16 chunks from $08000000 to $09FFFFFF, with no mirrors. With the module
