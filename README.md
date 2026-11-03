@@ -33,6 +33,7 @@ on this and learn more about assembly for the 68k.
 | `tools/disasm.py`        | disassembler for AmigaOS executables, used on the PP&S software   |
 | `tools/fetch.sh`         | downloads the original PP&S driver disks                          |
 | `tools/mkrelease.sh`     | packages a release (zip and ADF)                                  |
+| `tools/onerom-a2000.json` | the One ROM slots for the [test setup](#test-setup-one-rom)      |
 | `tests/`                 | runs the module on an emulated 68040 against simulated cards, and mkrom.py against a synthetic Kickstart |
 | `docs/hardware.md`       | the card: jumpers, memory layout, measurements                    |
 | `docs/reverse-engineering.md` | what the original driver does and how ppi2000mem differs     |
@@ -86,6 +87,85 @@ artifact. To publish a release:
 
 To read the original driver: `make disasm` downloads the PP&S disks into `vendor/` and writes
 the listings to `build/disasm/`.
+
+## Test setup: One ROM
+
+The reference machine can test ROM builds on a [One ROM](https://onerom.org) Fire 40 Rev B in the
+A2000's Kickstart socket instead of burning a chip. A new build can be running on the real card in
+a few seconds, from the host and with the case closed. This is optional and nothing else in this
+repository needs it.
+
+```
+make rom onerom-poke    # build the ROM, load it into the One ROM's RAM, reset the Amiga
+make onerom-menu        # back to the boot menu
+make onerom-flash       # build the ROM, write all the slots to flash, reset the Amiga
+make onerom-poke ONEROM_IMAGE=amiga_roms/onerom/diagrom-2.0-16bit.bin    # any other 512K image
+```
+
+These targets run the [`onerom` CLI](https://onerom.org/cli) on the host rather than in the tools
+container, because they need the USB connection. They expect the USB cable to be connected.
+
+### Slots
+
+`tools/onerom-a2000.json` holds what `make onerom-flash` writes. The board's 2 MB of flash fits
+three 512K images alongside the firmware and plugins, so anything else, such as DiagROM, is loaded
+with `make onerom-poke`.
+
+| Slot | Image                                                               |
+|------|---------------------------------------------------------------------|
+| 0    | `amiga_roms/onerom/amiga_boot_512k_always_menu.bin`, the boot menu  |
+| 1    | `build/CDTVA500A600A2000.47.115-ppi2000mem.bin`, this project's ROM |
+| 2    | `amiga_roms/CDTVA500A600A2000.47.115.bin`, stock 3.2.3              |
+
+All the images are byte-swapped (`.bin`), and are git-ignored for the reasons
+[below](#not-included). The boot menu is the
+[RBCP Amiga bootloader](https://github.com/piersfinlayson/rom-bus-control-protocol/tree/main/reference/host/68k/amiga-boot)
+built with `make ROM_KB=512 DEV=1`, which writes `build/amiga_boot_swapped.bin`. The stock build
+only opens the menu if both mouse buttons read as held at the moment it checks, which never
+happened on the reference machine. `DEV=1` always opens it. DiagROM's image is `16bit.bin` from
+the [DiagROM](https://www.diagrom.com/) release.
+
+### Reset wire
+
+A wire from the One ROM's `SEL_C` pin to the 68000's reset line lets the host reset the Amiga, with
+the 040 card fitted. The reference machine connects it at a via on the same net as the 68000's
+pin 18. Check the pin with a meter before connecting it, because the holes
+are easy to confuse. Reading the labels on the underside of the board, it is the lower hole in the
+`C` column, directly above the `CLK` label:
+
+```
+ SEL_A    SEL_B   BOOTSEL    RUN      5V       upper row of holes
+   A        B        C        D       5V       labels
+  GND      GND    [SEL_C]   SEL_D    GND       lower row of holes
+  0=Open            CLK      DIO     GND       labels
+```
+
+`SEL_C` and `SEL_D` are 5V tolerant. **`SEL_A` and `SEL_B` are 3.3V only, so never connect them to
+the reset line.** `onerom board header --board fire-40-b` draws the header from above.
+
+`make onerom-flash` always passes `--reserve-pin`, which stops the firmware reading the wire as an
+image select pin. Keep that option if you flash by hand. `SEL_C` is also the debug probe's clock,
+so remove the wire to use a probe.
+
+### What restarts what
+
+The menu copies the chosen image over the one in the One ROM's RAM, including the menu itself,
+and `make onerom-poke` does the same with its image. Only a restart of the One ROM brings the menu
+back. A reset of the Amiga doesn't restart it, and with USB connected neither does switching the
+Amiga off, because USB keeps the One ROM powered.
+
+| Action                                   | The Amiga then boots        |
+|------------------------------------------|-----------------------------|
+| Ctrl-Amiga-Amiga, or the reset wire      | the same image              |
+| Power cycle with USB connected           | the same image              |
+| Power cycle with USB unplugged           | the boot menu               |
+| `make onerom-menu`                       | the boot menu               |
+
+So a poked build survives a power cycle while USB is connected, which allows a true cold-start test
+of the module.
+
+Flashing, restarting or poking the One ROM changes the ROM under a running Amiga, so expect it to
+crash until the reset that follows.
 
 ## Status
 

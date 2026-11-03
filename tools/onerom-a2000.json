@@ -1,0 +1,56 @@
+{
+    "$schema": "https://images.onerom.org/configs/schema.json",
+    "version": 1,
+    "name": "A2000 menu, custom, stock",
+    "description": "RBCP boot menu, Kickstart 3.2.3 with ppi2000mem, and stock Kickstart 3.2.3. Paths are relative to the repository root; see the One ROM test setup in README.md.",
+    "chip_sets": [
+        {
+            "type": "single",
+            "chips": [
+                {
+                    "type": "system_plugin",
+                    "plugin": "usb"
+                }
+            ]
+        },
+        {
+            "type": "single",
+            "chips": [
+                {
+                    "type": "user_plugin",
+                    "plugin": "host-control"
+                }
+            ]
+        },
+        {
+            "type": "single",
+            "chips": [
+                {
+                    "label": "Bootloader",
+                    "file": "amiga_roms/onerom/amiga_boot_512k_always_menu.bin",
+                    "type": "27C400"
+                }
+            ]
+        },
+        {
+            "type": "single",
+            "chips": [
+                {
+                    "label": "Kickstart 3.2.3 PPS040",
+                    "file": "build/CDTVA500A600A2000.47.115-ppi2000mem.bin",
+                    "type": "27C400"
+                }
+            ]
+        },
+        {
+            "type": "single",
+            "chips": [
+                {
+                    "label": "Kickstart 3.2.3",
+                    "file": "amiga_roms/CDTVA500A600A2000.47.115.bin",
+                    "type": "27C400"
+                }
+            ]
+        }
+    ]
+}
