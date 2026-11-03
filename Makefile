@@ -1,4 +1,6 @@
-# Everything runs in the tools container (see docker/Dockerfile).
+# Everything runs in the tools container (see docker/Dockerfile), except the
+# onerom-* targets: they run the onerom CLI on the host, which owns the USB
+# connection. See "Test setup: One ROM" in README.md.
 # KICK (only needed for `make rom`) must be inside this directory, since only
 # it is mounted.
 
@@ -9,12 +11,19 @@ COPIES ?= 1
 # Set by the release workflow; mkrelease.sh refuses a tag that doesn't match
 # the version in src/ppi2000mem.asm.
 RELEASE_TAG ?=
+# The One ROM header pin wired to the host's reset line.
+ONEROM_RESET_PIN ?= sel_c
+# The 512K, byte-swapped image `make onerom-poke` loads.
+ONEROM_IMAGE     ?= $(ROM).bin
+# Names the default KICK's ROM, so a build from another KICK needs its own config.
+ONEROM_CONFIG    ?= tools/onerom-a2000.json
 
 RUN  := docker compose run --rm -T -e RELEASE_TAG=$(RELEASE_TAG) tools
 VASM := vasmm68k_mot -Fhunkexe -nosym -quiet
 PPS  := vendor/pps040/files/PPS_040-24_2/PPI_040
 
-.PHONY: help image fetch modules test disasm bootdisk rom release clean
+.PHONY: help image fetch modules test disasm bootdisk rom release clean \
+	onerom-menu onerom-poke onerom-flash
 
 help:
 	@echo "make image     build the tools container"
@@ -26,6 +35,10 @@ help:
 	@echo "make rom       patch KICK with the module into $(ROM).rom/.bin"
 	@echo "               (COPIES=4 also writes -x4.bin for a 2 MB chip)"
 	@echo "make release   package the binaries, mkrom.py and docs in build/release"
+	@echo "make onerom-menu   restart the One ROM and reset the Amiga into the boot menu"
+	@echo "make onerom-poke   load ONEROM_IMAGE into the One ROM's RAM and reset the Amiga"
+	@echo "                   (default $(ROM).bin; lost when the One ROM restarts)"
+	@echo "make onerom-flash  build the ROM, flash ONEROM_CONFIG and reset the Amiga"
 
 image:
 	docker compose build tools
@@ -60,6 +73,20 @@ rom: modules
 
 release: modules test
 	$(RUN) tools/mkrelease.sh
+
+onerom-menu:
+	onerom reboot && onerom control reset --pin $(ONEROM_RESET_PIN)
+
+# Doesn't depend on rom, as ONEROM_IMAGE need not be our build: use
+# `make rom onerom-poke` to load a fresh one.
+onerom-poke:
+	@test -f "$(ONEROM_IMAGE)" || { echo "No image at $(ONEROM_IMAGE); run make rom or set ONEROM_IMAGE" >&2; exit 1; }
+	onerom poke --address 0 --input $(ONEROM_IMAGE) && onerom control reset --pin $(ONEROM_RESET_PIN)
+
+# The pin must be reserved on every flash, or the firmware reads the reset line
+# as an image select pin.
+onerom-flash: rom
+	onerom program --config $(ONEROM_CONFIG) --reserve-pin $(ONEROM_RESET_PIN) --reset-host $(ONEROM_RESET_PIN)
 
 clean:
 	rm -rf build
